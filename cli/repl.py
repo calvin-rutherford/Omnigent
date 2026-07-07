@@ -8,6 +8,8 @@ from rich.console import Console
 
 console = Console()
 
+IS_STATEFUL = True
+
 async def listen_to_broker(websocket):
     try:
         async for message in websocket:
@@ -23,6 +25,13 @@ async def listen_to_broker(websocket):
                     console.print(f"[dim]{text}[/dim]")
                 else:
                     console.print(text)
+            elif msg_type == "approval_request":
+                approval_id = data.get("approval_id")
+                command = data.get("command")
+                console.print(f"\n[bold red blink]⚠️ APPROVAL REQUIRED ⚠️[/bold red blink]")
+                console.print(f"[bold yellow]Agent requests to run bash command in sandbox:[/bold yellow] {command}")
+                console.print(f"[dim]Type '!approve {approval_id}' or '!deny {approval_id}'[/dim]\n")
+                
     except websockets.exceptions.ConnectionClosed:
         console.print("[bold red]Connection to broker closed.[/bold red]")
     except asyncio.CancelledError:
@@ -31,6 +40,7 @@ async def listen_to_broker(websocket):
         console.print(f"[bold red]Listener Error:[/] {e}")
 
 async def run_repl():
+    global IS_STATEFUL
     uri = "ws://localhost:8000/ws/broker/"
     session = PromptSession()
     
@@ -49,12 +59,42 @@ async def run_repl():
                     try:
                         # Wait for user input asynchronously
                         user_input = await session.prompt_async("Omni > ")
-                        
-                        if not user_input.strip():
+                        user_input = user_input.strip()
+                        if not user_input:
                             continue
                             
-                        if user_input.strip().lower() in ["exit", "quit"]:
+                        if user_input.lower() in ["exit", "quit"]:
                             break
+                            
+                        if user_input.startswith("!stateless"):
+                            IS_STATEFUL = False
+                            console.print("[bold yellow]Switched to STATELESS mode. Broker will not retrieve past messages.[/bold yellow]")
+                            continue
+                            
+                        if user_input.startswith("!stateful"):
+                            IS_STATEFUL = True
+                            console.print("[bold green]Switched to STATEFUL mode. Broker will retrieve past messages.[/bold green]")
+                            continue
+                            
+                        if user_input.startswith("!approve "):
+                            approval_id = user_input.split(" ")[1].strip()
+                            await websocket.send(json.dumps({
+                                "type": "approval_response",
+                                "id": approval_id,
+                                "approved": True
+                            }))
+                            console.print(f"[bold green]Approved request {approval_id}[/bold green]")
+                            continue
+                            
+                        if user_input.startswith("!deny "):
+                            approval_id = user_input.split(" ")[1].strip()
+                            await websocket.send(json.dumps({
+                                "type": "approval_response",
+                                "id": approval_id,
+                                "approved": False
+                            }))
+                            console.print(f"[bold red]Denied request {approval_id}[/bold red]")
+                            continue
                             
                         # Handle local shell commands
                         if user_input.startswith("!"):
@@ -76,7 +116,8 @@ async def run_repl():
 
                         # Send normal message to broker
                         await websocket.send(json.dumps({
-                            "message": user_input
+                            "message": user_input,
+                            "stateful": IS_STATEFUL
                         }))
                         
                     except (EOFError, KeyboardInterrupt):

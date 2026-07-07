@@ -65,6 +65,7 @@ services:
     command: bash -c "cd backend && celery -A og_broker worker -l info"
     volumes:
       - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
     env_file:
       - .env
     environment:
@@ -79,6 +80,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  sandbox:
+    image: ubuntu:22.04
+    container_name: omnigent-sandbox
+    command: tail -f /dev/null
 
 volumes:
   pgdata:

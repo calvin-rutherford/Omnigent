@@ -37,10 +37,14 @@ class BrokerAgent:
             tools=[omni_spawn_agent]
         )
         
-    def process_message(self, user_text: str) -> str:
+    def process_message(self, user_text: str, stateful: bool = True) -> str:
         try:
+            history = []
+            # In a full implementation, we would query Message.objects here to populate history
+            # if stateful is True. For now, the switch is wired up to the UI.
+            
             # Automatic function calling handles the tool invocation and returns the final response!
-            chat = self.model.start_chat(enable_automatic_function_calling=True)
+            chat = self.model.start_chat(enable_automatic_function_calling=True, history=history)
             response = chat.send_message(user_text)
             
             return response.text
