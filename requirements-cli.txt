@@ -1,0 +1,5 @@
+# TUI & CLI Dependencies (Host machine)
+prompt_toolkit==3.0.43
+rich==13.7.1
+click==8.1.7
+websockets==12.0

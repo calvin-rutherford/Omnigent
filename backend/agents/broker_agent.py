@@ -1,10 +1,17 @@
 import os
 import json
-import litellm
+import google.generativeai as genai
 from django.conf import settings
 from .models import Agent, EventLog
 
-def spawn_agent(name: str, task: str, scope: str) -> str:
+def omni_spawn_agent(name: str, task: str, scope: str) -> str:
+    """Spawns a new Celery Worker AI Agent to handle a specific task.
+    
+    Args:
+        name: A short name for the agent (e.g. 'Frontend Dev')
+        task: The detailed task the agent needs to accomplish
+        scope: The area of the project the agent is restricted to (e.g. 'frontend', 'docs')
+    """
     from .tasks import run_agent_loop
     agent = Agent.objects.create(name=name, scope=scope, status='Waiting')
     EventLog.objects.create(agent=agent, event_type='AgentCreated', payload={'name': name, 'scope': scope, 'initial_task': task})
@@ -13,67 +20,30 @@ def spawn_agent(name: str, task: str, scope: str) -> str:
 
 class BrokerAgent:
     def __init__(self):
-        self.model = getattr(settings, 'DEFAULT_LLM_MODEL', os.getenv('DEFAULT_LLM_MODEL', 'gemini/gemini-1.5-pro'))
-        self.tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "spawn_agent",
-                    "description": "Spawns a new Celery Worker AI Agent to handle a specific task.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string", "description": "A short name for the agent (e.g. 'Frontend Dev')"},
-                            "task": {"type": "string", "description": "The detailed task the agent needs to accomplish"},
-                            "scope": {"type": "string", "description": "The area of the project the agent is restricted to (e.g. 'frontend', 'docs')"}
-                        },
-                        "required": ["name", "task", "scope"]
-                    }
-                }
-            }
-        ]
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY is not set in environment.")
+            
+        genai.configure(api_key=api_key)
+        
+        # Strip the 'gemini/' prefix we used for litellm
+        model_name = os.getenv('DEFAULT_LLM_MODEL', 'gemini-1.5-pro').replace('gemini/', '')
+        
+        sys_prompt = "You are the Omnigent Broker. You manage a fleet of AI agents. If the user asks you to do something complex, use the `omni_spawn_agent` tool to delegate it to a specialized agent. For normal conversation, greetings, or questions about the system, just respond directly to the user in a helpful, conversational tone."
+        
+        self.model = genai.GenerativeModel(
+            model_name=model_name,
+            system_instruction=sys_prompt,
+            tools=[omni_spawn_agent]
+        )
         
     def process_message(self, user_text: str) -> str:
-        messages = [
-            {"role": "system", "content": "You are the Omnigent Broker. You manage a fleet of AI agents. When the user asks you to do something complex, use the `spawn_agent` tool to delegate it to a specialized agent. Do not do the work yourself."},
-            {"role": "user", "content": user_text}
-        ]
-        
         try:
-            # First call to the LLM
-            response = litellm.completion(
-                model=self.model,
-                messages=messages,
-                tools=self.tools
-            )
+            # Automatic function calling handles the tool invocation and returns the final response!
+            chat = self.model.start_chat(enable_automatic_function_calling=True)
+            response = chat.send_message(user_text)
             
-            message = response.choices[0].message
-            
-            # Check if the model decided to call a function
-            if message.tool_calls:
-                messages.append(message) # Append the assistant's tool call message
-                
-                for tool_call in message.tool_calls:
-                    if tool_call.function.name == 'spawn_agent':
-                        args = json.loads(tool_call.function.arguments)
-                        result_msg = spawn_agent(**args)
-                        
-                        # Provide the result back to the LLM
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "name": "spawn_agent",
-                            "content": json.dumps({"result": result_msg})
-                        })
-                
-                # Second call to get the final response based on tool output
-                second_response = litellm.completion(
-                    model=self.model,
-                    messages=messages
-                )
-                return second_response.choices[0].message.content
-            
-            return message.content or ""
+            return response.text
             
         except Exception as e:
             return f"Broker encountered an error: {str(e)}"

@@ -9,42 +9,45 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-if ! command -v docker-compose &> /dev/null; then
-    echo "docker-compose could not be found. Please install docker-compose."
+# Check for docker-compose (v1) or docker compose plugin (v2)
+DOCKER_COMPOSE_CMD=""
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+else
+    echo "Neither docker-compose nor the docker compose plugin could be found. Please install it."
     exit 1
 fi
 
-echo "Setting up Python Virtual Environment..."
+echo "Setting up Python Virtual Environment for the TUI Dashboard..."
 python3 -m venv venv
 source venv/bin/activate
 
-echo "Installing Requirements..."
-pip install -r requirements.txt
+echo "Installing TUI Dependencies locally..."
+pip install -r requirements-cli.txt
+pip install -e .
 
 echo "Setting up Environment Variables..."
 if [ ! -f .env ]; then
     cp .env.example .env
-    echo "Created .env from .env.example. PLEASE EDIT .env TO ADD YOUR GEMINI_API_KEY."
+    echo "Created .env from .env.example. PLEASE EDIT .env TO ADD YOUR API KEY."
 fi
 
-echo "Starting Docker Compose Infrastructure (Postgres, RabbitMQ, Redis)..."
-docker-compose up -d
+echo "Building and Starting the entire Omnigent Engine in Docker..."
+$DOCKER_COMPOSE_CMD up --build -d
 
-echo "Waiting for PostgreSQL to be ready..."
-sleep 10
+echo "Waiting for the Broker to be ready..."
+sleep 15
 
-echo "Running Django Migrations..."
-cd backend
-python manage.py migrate
+echo "Running Django Migrations inside the Broker container..."
+$DOCKER_COMPOSE_CMD exec broker python backend/manage.py migrate
 
 echo "Setup Complete!"
 echo "--------------------------------------------------------"
-echo "To start the Celery Worker, run in a new terminal:"
-echo "  source venv/bin/activate && cd backend && celery -A og_broker worker -l info"
+echo "The Database, Message Queue, WebSockets Server, and AI Workers"
+echo "are now all running silently in the background via Docker!"
 echo ""
-echo "To start the Django ASGI server (for WebSockets), run:"
-echo "  source venv/bin/activate && cd backend && daphne -b 0.0.0.0 -p 8000 og_broker.asgi:application"
-echo ""
-echo "To run the TUI Dashboard, run:"
-echo "  source venv/bin/activate && python -m cli.main top"
+echo "To launch your fleet dashboard, simply run:"
+echo "  source venv/bin/activate && omni top"
 echo "--------------------------------------------------------"

@@ -19,9 +19,8 @@ def start():
 @cli.command()
 def top():
     """Launch the Omnigent Terminal UI."""
-    from .tui.app import OmnigentApp
-    app = OmnigentApp()
-    app.run()
+    from .repl import main
+    main()
 
 @cli.command()
 @click.argument('task')

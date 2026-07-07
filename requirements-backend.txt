@@ -6,7 +6,8 @@ daphne==4.1.2
 channels-redis==4.2.0
 
 # Database
-psycopg2-binary==2.9.9
+psycopg[binary]>=3.1.8
+dj-database-url==2.1.0
 
 # Celery & RabbitMQ
 celery==5.4.0
@@ -14,15 +15,10 @@ redis==5.0.4
 
 # LLM integration
 google-generativeai==0.5.4
-litellm==1.40.1
 
-# TUI & CLI
-textual==0.65.2
-click==8.1.7
 
 # Utility
 python-dotenv==1.0.1
 httpx==0.27.0
-websockets==12.0
 uvicorn==0.29.0
 pydantic==2.7.1

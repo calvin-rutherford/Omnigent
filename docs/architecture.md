@@ -6,7 +6,7 @@ Omnigent is designed around an event-driven, broker-worker model. It utilizes a 
 
 ```mermaid
 graph TD
-    User([User]) -->|Natural Language| TUI[Textual TUI Dashboard]
+    User([User]) -->|Natural Language / !Commands| TUI[Textual TUI / omni CLI]
     TUI <-->|WebSockets (Channels)| Django[Django Backend / Broker]
     
     subgraph "Broker Node"
@@ -30,7 +30,10 @@ graph TD
 ## Core Abstractions
 
 ### 1. The Broker Agent
-The Broker isn't just a router—it's an LLM equipped with Function Calling. When a user types a command in the TUI, the Broker interprets the intent. If a complex task is requested, the Broker autonomously invokes the `spawn_agent` tool to dispatch a Celery worker.
+The Broker isn't just a router—it's an LLM equipped with Function Calling. When a user types a command in the TUI, the Broker interprets the intent. If a complex task is requested, the Broker autonomously invokes the `omni_spawn_agent` tool to dispatch a Celery worker. The Broker is also explicitly prompted to converse naturally when you are just chatting.
+
+### 1.5. Native TUI & Shell Passthrough
+While the Broker and workers run safely inside a Docker-compose environment, the TUI is a thin, native client on the host machine. By prefixing commands with `!`, the user can execute arbitrary shell commands (e.g., `!git status`) natively on the host machine, seeing the output directly in the TUI without disrupting the LLM context.
 
 ### 2. Append-Only Event Log
 Every action is recorded in the `EventLog` database table. 

@@ -31,9 +31,10 @@ Omnigent gives you a calm, inspectable, `htop`-style terminal dashboard to monit
 ## ✨ Features
 
 - **🤖 Intelligent Broker:** Type natural language into the TUI, and the Broker Agent automatically spins up specialized sub-agents to do the heavy lifting!
+- **💻 Calm TUI & CLI:** A beautiful, non-flashing terminal UI built with Textual, complete with an `omni` CLI tool.
+- **⚡ Local Shell Passthrough:** Run commands like `!docker compose ps` straight from the TUI to execute them locally on your host machine without opening another terminal!
 - **📦 Any LLM You Want:** Powered by LiteLLM, you can use Gemini, OpenAI, Anthropic, or even your own Local LLaMA!
 - **📜 Event-Driven History:** Every task, message, and artifact is logged to an append-only PostgreSQL database.
-- **💻 Calm TUI:** A beautiful, non-flashing terminal UI built with Textual.
 
 ## 🏗️ How It Works
 
@@ -84,7 +85,7 @@ Omnigent uses a production-grade backend (Django, PostgreSQL, RabbitMQ, Redis). 
 4. **Launch the TUI Dashboard 🎛️:**
    ```bash
    source venv/bin/activate
-   python -m cli.main top
+   omni top
    ```
 
 Now, just type `"Analyze the authentication system and create a test plan"` into the bottom bar and watch the Broker spawn an agent to do it for you!
